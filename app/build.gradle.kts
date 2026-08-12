@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.agrogarden"
-    compileSdk = 35
+    compileSdk = 35 
 
     defaultConfig {
         applicationId = "com.agrogarden"
