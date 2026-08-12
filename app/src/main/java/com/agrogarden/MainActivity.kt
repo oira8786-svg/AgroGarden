@@ -1,5 +1,5 @@
 package com.agrogarden
-import androidx.compose.material3.ExperimentalMaterial3Api
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -28,14 +29,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.room.Room
 import com.agrogarden.data.AppDb
 import com.agrogarden.data.Crop
 import com.agrogarden.data.Fertilizer
@@ -72,12 +71,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgroApp(db: AppDb) {
 
-val selectedTabState = remember { mutableStateOf(0) }
-val selectedTab = selectedTabState.value
+    val selectedTabState = remember {
+        mutableStateOf(0)
+    }
+
+    val selectedTab = selectedTabState.value
 
     val tabs = listOf(
         "🌱 Посевы",
@@ -102,6 +105,7 @@ val selectedTab = selectedTabState.value
                 }
             )
         },
+
         bottomBar = {
             NavigationBar {
 
@@ -111,12 +115,15 @@ val selectedTab = selectedTabState.value
 
                     NavigationBarItem(
                         selected = selectedTab == index,
+
                         onClick = {
-                            selectedTab = index
+                            selectedTabState.value = index
                         },
+
                         icon = {
                             Text(title.take(2))
                         },
+
                         label = {
                             Text(
                                 title
@@ -128,6 +135,7 @@ val selectedTab = selectedTabState.value
                 }
             }
         }
+
     ) { paddingValues ->
 
         Column(
@@ -219,10 +227,13 @@ fun CropScreen(db: AppDb) {
 
             OutlinedTextField(
                 value = name,
+
                 onValueChange = {
                     name = it
                 },
+
                 modifier = Modifier.weight(1f),
+
                 label = {
                     Text("Культура")
                 }
@@ -250,6 +261,7 @@ fun CropScreen(db: AppDb) {
                         name = ""
                     }
                 },
+
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("➕")
@@ -268,11 +280,13 @@ fun CropScreen(db: AppDb) {
                     headlineContent = {
                         Text(crop.name)
                     },
+
                     supportingContent = {
                         Text(
                             "Площадь: ${crop.area} | ${crop.status}"
                         )
                     },
+
                     trailingContent = {
 
                         TextButton(
@@ -313,10 +327,13 @@ fun SeedScreen(db: AppDb) {
 
             OutlinedTextField(
                 value = name,
+
                 onValueChange = {
                     name = it
                 },
+
                 modifier = Modifier.weight(1f),
+
                 label = {
                     Text("Семена")
                 }
@@ -343,6 +360,7 @@ fun SeedScreen(db: AppDb) {
                         name = ""
                     }
                 },
+
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("➕")
@@ -361,6 +379,7 @@ fun SeedScreen(db: AppDb) {
                     headlineContent = {
                         Text(seed.name)
                     },
+
                     supportingContent = {
                         Text(
                             "${seed.quantity} ${seed.unit} | " +
@@ -368,6 +387,7 @@ fun SeedScreen(db: AppDb) {
                                 "годность ${seed.expiry}"
                         )
                     },
+
                     trailingContent = {
 
                         TextButton(
@@ -408,10 +428,13 @@ fun FertilizerScreen(db: AppDb) {
 
             OutlinedTextField(
                 value = name,
+
                 onValueChange = {
                     name = it
                 },
+
                 modifier = Modifier.weight(1f),
+
                 label = {
                     Text("Удобрение")
                 }
@@ -437,6 +460,7 @@ fun FertilizerScreen(db: AppDb) {
                         name = ""
                     }
                 },
+
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("➕")
@@ -455,6 +479,7 @@ fun FertilizerScreen(db: AppDb) {
                     headlineContent = {
                         Text(fertilizer.name)
                     },
+
                     supportingContent = {
                         Text(
                             "Остаток: ${fertilizer.quantity} " +
@@ -462,6 +487,7 @@ fun FertilizerScreen(db: AppDb) {
                                 "минимум: ${fertilizer.minStock}"
                         )
                     },
+
                     trailingContent = {
 
                         if (fertilizer.quantity <= fertilizer.minStock) {
@@ -497,10 +523,13 @@ fun IrrigationScreen(db: AppDb) {
 
             OutlinedTextField(
                 value = crop,
+
                 onValueChange = {
                     crop = it
                 },
+
                 modifier = Modifier.weight(1f),
+
                 label = {
                     Text("Культура")
                 }
@@ -527,6 +556,7 @@ fun IrrigationScreen(db: AppDb) {
                         crop = ""
                     }
                 },
+
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("➕")
@@ -545,13 +575,16 @@ fun IrrigationScreen(db: AppDb) {
                     headlineContent = {
                         Text(irrigation.crop)
                     },
+
                     supportingContent = {
                         Text(
-                            "${irrigation.date} ${irrigation.time} | " +
-                                "${irrigation.volume} л | " +
+                            "Дата: ${irrigation.date} | " +
+                                "Время: ${irrigation.time} | " +
+                                "Объём: ${irrigation.volume} | " +
                                 "каждые ${irrigation.repeatDays} дн."
                         )
                     },
+
                     trailingContent = {
 
                         TextButton(
