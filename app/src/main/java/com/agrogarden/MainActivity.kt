@@ -1,5 +1,5 @@
 package com.agrogarden
-
+import androidx.compose.material3.ExperimentalMaterial3Api
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgroApp(db: AppDb) {
 
