@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 android {
+compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
     namespace = "com.agrogarden"
     compileSdk = 35
     defaultConfig {
@@ -13,6 +17,9 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+}
+kotlin {
+    jvmToolchain(17)
 }
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
