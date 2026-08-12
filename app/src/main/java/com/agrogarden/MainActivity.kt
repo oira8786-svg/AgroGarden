@@ -76,9 +76,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AgroApp(db: AppDb) {
 
-    var selectedTab by remember {
-        mutableIntStateOf(0)
-    }
+val selectedTabState = remember { mutableStateOf(0) }
+val selectedTab = selectedTabState.value
 
     val tabs = listOf(
         "🌱 Посевы",
