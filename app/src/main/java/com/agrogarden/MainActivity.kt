@@ -2,89 +2,451 @@ package com.agrogarden
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Divider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import com.agrogarden.data.*
-import com.agrogarden.notifications.ReminderWorker
-import kotlinx.coroutines.flow.first
+import com.agrogarden.data.AppDb
+import com.agrogarden.data.Crop
+import com.agrogarden.data.Expense
+import com.agrogarden.data.Fertilizer
+import com.agrogarden.data.Harvest
+import com.agrogarden.data.Irrigation
+import com.agrogarden.data.Note
+import com.agrogarden.data.Sale
+import com.agrogarden.data.Seed
+import com.agrogarden.data.Task
+import com.agrogarden.data.Treatment
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
-private data class Plant(val id:String,val name:String,val category:String,val family:String,val light:String,val water:String,val soil:String,val description:String,val diseases:String,val pests:String)
-private val plants=listOf(
- Plant("bean","Фасоль","Овощные","Бобовые","Солнце","Умеренный","Лёгкая плодородная","Теплолюбивая культура.","Антракноз, бактериоз","Тля, фасолевая зерновка"),
- Plant("tomato","Томат","Овощные","Паслёновые","Солнце","Умеренный","Плодородная","Нуждается в подвязке и проветривании.","Фитофтороз, кладоспориоз","Белокрылка, тля"),
- Plant("cucumber","Огурец","Овощные","Тыквенные","Солнце/полутень","Частый","Влажная плодородная","Требует стабильной влажности и тепла.","Мучнистая роса","Паутинный клещ, тля"),
- Plant("potato","Картофель","Овощные","Паслёновые","Солнце","Умеренный","Рыхлая","Окучивание и севооборот.","Фитофтороз","Колорадский жук"),
- Plant("apple","Яблоня","Плодово-ягодные","Розовые","Солнце","Умеренный","Суглинистая","Плодовое дерево для сада.","Парша, плодовая гниль","Яблонная плодожорка, тля"),
- Plant("strawberry","Клубника","Плодово-ягодные","Розовые","Солнце","Умеренный","Слабокислая","Мульчирование сохраняет влагу.","Серая гниль","Земляничный клещ, долгоносик"),
- Plant("currant","Смородина","Плодово-ягодные","Крыжовниковые","Солнце/полутень","Умеренный","Плодородная","Кустарник с ранним плодоношением.","Антракноз","Почковый клещ, тля"),
- Plant("rose","Роза","Садовые","Розовые","Солнце","Умеренный","Плодородная","Декоративное растение с обрезкой.","Чёрная пятнистость, мучнистая роса","Тля, паутинный клещ"),
- Plant("ficus","Фикус","Комнатные","Тутовые","Яркий рассеянный","После подсыхания","Воздухопроницаемая","Комнатное растение без перепадов температуры.","Корневая гниль","Щитовка, мучнистый червец")
-)
-
-class MainActivity:ComponentActivity(){
- override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);if(Build.VERSION.SDK_INT>=33)requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"),10);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("agro","AgroGarden",NotificationManager.IMPORTANCE_DEFAULT));setContent{AgroApp(AppDb.get(this))}}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 10)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel("agro", "FAYOZAGRO", NotificationManager.IMPORTANCE_DEFAULT)
+            )
+        }
+        setContent { FAYOZAGRO(AppDb.get(this)) }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun AgroApp(db:AppDb){
- val context=LocalContext.current;val scope=rememberCoroutineScope();var screen by remember{mutableStateOf("home")};var drawerOpen by remember{mutableStateOf(false)};var exportMode by remember{mutableStateOf<String?>(null)};val drawerState=rememberDrawerState(DrawerValue.Closed)
- LaunchedEffect(drawerOpen){if(drawerOpen)drawerState.open()else drawerState.close()}
- val exporter=androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->if(uri!=null)scope.launch{if(exportMode=="backup")exportBackup(context,db,uri)else exportQuiz(context,uri)};exportMode=null}
- fun nav(s:String){screen=s;drawerOpen=false}
- ModalNavigationDrawer(drawerState=drawerState,drawerContent={ModalDrawerSheet{Text("🌿 AgroGarden",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.padding(20.dp));DrawerItem("⌂","Домашняя страница",screen=="home"){nav("home")};HorizontalDivider();Text("Энциклопедия",style=MaterialTheme.typography.labelLarge,modifier=Modifier.padding(16.dp,10.dp,16.dp,4.dp));DrawerItem("🌱","Все растения",screen=="plants"){nav("plants")};DrawerItem("♧","Семейства",screen=="families"){nav("families")};DrawerItem("🪴","Комнатные растения",screen=="indoor"){nav("indoor")};DrawerItem("🌳","Садовые растения",screen=="garden"){nav("garden")};DrawerItem("🍎","Плодово-ягодные",screen=="fruit"){nav("fruit")};DrawerItem("🥕","Овощные растения",screen=="vegetables"){nav("vegetables")};DrawerItem("🦠","Болезни",screen=="diseases"){nav("diseases")};DrawerItem("🐞","Вредители",screen=="pests"){nav("pests")};HorizontalDivider();DrawerItem("📅","Календарь садовода",screen=="calendar"){nav("calendar")};DrawerItem("🔔","Менеджер растений",screen=="tasks"){nav("tasks")};DrawerItem("📝","Блокнот",screen=="notes"){nav("notes")};DrawerItem("❤️","Избранное",screen=="favorites"){nav("favorites")};DrawerItem("📥","Скачать викторину",false){exportMode="quiz";exporter.launch("agrogarden-quiz.json")};HorizontalDivider();Text("Хозяйство",style=MaterialTheme.typography.labelLarge,modifier=Modifier.padding(16.dp,10.dp,16.dp,4.dp));DrawerItem("🌾","Посевы",screen=="crops"){nav("crops")};DrawerItem("🌱","Семена",screen=="seeds"){nav("seeds")};DrawerItem("🧪","Удобрения",screen=="fertilizers"){nav("fertilizers")};DrawerItem("💧","Полив",screen=="irrigation"){nav("irrigation")};DrawerItem("💰","Продажи",screen=="sales"){nav("sales")};DrawerItem("🧺","Урожай",screen=="harvest"){nav("harvest")};DrawerItem("📉","Расходы",screen=="expenses"){nav("expenses")};DrawerItem("🛡️","Обработки",screen=="treatments"){nav("treatments")};DrawerItem("📦","Склад",screen=="warehouse"){nav("warehouse")};DrawerItem("📊","Прибыль",screen=="profit"){nav("profit")};DrawerItem("💾","Резервная копия",false){exportMode="backup";exporter.launch("agrogarden-backup.json")}}}){
- Scaffold(topBar={TopAppBar(title={Text(titleFor(screen))},navigationIcon={IconButton({drawerOpen=true}){Text("☰")}})}){padding->Box(Modifier.fillMaxSize().padding(padding)){when(screen){"home"->HomeScreen(db,::nav);"plants"->PlantCatalogScreen(db,"Все растения");"families"->PlantCatalogScreen(db,"Все растения");"indoor"->PlantCatalogScreen(db,"Комнатные");"garden"->PlantCatalogScreen(db,"Садовые");"fruit"->PlantCatalogScreen(db,"Плодово-ягодные");"vegetables"->PlantCatalogScreen(db,"Овощные");"diseases"->KnowledgeScreen("Болезни",plants.flatMap{p->p.diseases.split(", ").map{it to p.name}}.distinct());"pests"->KnowledgeScreen("Вредители",plants.flatMap{p->p.pests.split(", ").map{it to p.name}}.distinct());"calendar"->CalendarScreen(db);"tasks"->TaskScreen(db);"notes"->NotesScreen(db);"favorites"->FavoritesScreen(db);"crops"->CropScreen(db);"seeds"->SeedScreen(db);"fertilizers"->FertilizerScreen(db);"irrigation"->IrrigationScreen(db);"sales"->SalesScreen(db);"harvest"->HarvestScreen(db);"expenses"->ExpenseScreen(db);"treatments"->TreatmentScreen(db);"warehouse"->WarehouseScreen(db);"profit"->ProfitScreen(db)}}}}
+private data class Tab(val title: String, val icon: String)
+
+@Composable
+fun FAYOZAGRO(db: AppDb) {
+    val tabs = remember {
+        listOf(
+            Tab("Главная", "⌂"),
+            Tab("Посевы", "🌾"),
+            Tab("Семена", "🌱"),
+            Tab("Удобрения", "🧪"),
+            Tab("Полив", "💧"),
+            Tab("Напоминания", "🔔"),
+            Tab("Продажи", "💰"),
+            Tab("Урожай", "🧺"),
+            Tab("Расходы", "📉"),
+            Tab("Обработки", "🛡️"),
+            Tab("Календарь", "📅"),
+            Tab("Склад", "📦"),
+            Tab("Прибыль", "📊"),
+            Tab("Блокнот", "📝")
+        )
+    }
+    var selected by remember { mutableIntStateOf(0) }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("FAYOZAGRO • ${tabs[selected].title}") }) },
+        bottomBar = {
+            NavigationBar {
+                val start = (selected / 4) * 4
+                tabs.drop(start).take(4).forEachIndexed { local, tab ->
+                    val index = start + local
+                    NavigationBarItem(
+                        selected = selected == index,
+                        onClick = { selected = index },
+                        icon = { Text(tab.icon) },
+                        label = { Text(tab.title.take(9)) }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (tabs.size > 4) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val page = selected / 4
+                    repeat((tabs.size + 3) / 4) { p ->
+                        OutlinedButton(onClick = { selected = p * 4 }) {
+                            Text("${p + 1}")
+                        }
+                    }
+                }
+            }
+            when (selected) {
+                0 -> HomeScreen(db) { selected = it }
+                1 -> CropsScreen(db)
+                2 -> SeedsScreen(db)
+                3 -> FertilizersScreen(db)
+                4 -> IrrigationScreen(db)
+                5 -> TasksScreen(db)
+                6 -> SalesScreen(db)
+                7 -> HarvestScreen(db)
+                8 -> ExpensesScreen(db)
+                9 -> TreatmentsScreen(db)
+                10 -> CalendarScreen(db)
+                11 -> WarehouseScreen(db)
+                12 -> ProfitScreen(db)
+                13 -> NotesScreen(db)
+            }
+        }
+    }
 }
 
-@Composable private fun DrawerItem(icon:String,text:String,selected:Boolean,onClick:()->Unit)=NavigationDrawerItem(label={Text(text)},selected=selected,onClick=onClick,icon={Text(icon)},modifier=Modifier.padding(NavigationDrawerItemDefaults.ItemPadding))
-private fun titleFor(s:String)=mapOf("home" to "AgroGarden","plants" to "Все растения","families" to "Семейства","indoor" to "Комнатные растения","garden" to "Садовые растения","fruit" to "Плодово-ягодные","vegetables" to "Овощные растения","diseases" to "Болезни","pests" to "Вредители","calendar" to "Календарь садовода","tasks" to "Менеджер растений","notes" to "Блокнот","favorites" to "Избранное","crops" to "Посевы","seeds" to "Семена","fertilizers" to "Удобрения","irrigation" to "Полив","sales" to "Продажи","harvest" to "Урожай","expenses" to "Расходы","treatments" to "Обработки","warehouse" to "Склад","profit" to "Прибыль")[s]?:"AgroGarden"
+@Composable
+private fun HomeScreen(db: AppDb, open: (Int) -> Unit) {
+    val fertilizers by db.fertilizers().all().collectAsState(emptyList())
+    val tasks by db.tasks().all().collectAsState(emptyList())
+    val sales by db.sales().all().collectAsState(emptyList())
+    val expenses by db.expenses().all().collectAsState(emptyList())
+    val revenue = sales.sumOf { it.quantity * it.price }
+    val costs = expenses.sumOf { it.amount }
+    LazyColumn(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { Text("Панель хозяйства", style = MaterialTheme.typography.headlineSmall) }
+        item { InfoCard("💰 Финансы", "Выручка: ${money(revenue)} • Расходы: ${money(costs)} • Прибыль: ${money(revenue - costs)}") }
+        item { InfoCard("⚠️ Минимальные остатки", if (fertilizers.any { it.quantity <= it.minStock }) "Есть удобрения ниже минимума" else "Все остатки в норме") }
+        item { InfoCard("🔔 Напоминания", "Незавершённых задач: ${tasks.count { !it.done }}") }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button({ open(2) }, Modifier.weight(1f)) { Text("🌱 Семена") }
+                Button({ open(3) }, Modifier.weight(1f)) { Text("🧪 Запасы") }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button({ open(4) }, Modifier.weight(1f)) { Text("💧 Полив") }
+                Button({ open(5) }, Modifier.weight(1f)) { Text("🔔 Задачи") }
+            }
+        }
+        item { Text("Каждая запись ниже имеет Добавить + Изменить + Удалить.", style = MaterialTheme.typography.bodyMedium) }
+    }
+}
 
-@Composable private fun HomeScreen(db:AppDb,nav:(String)->Unit){val crops by db.crops().all().collectAsState(emptyList());val seeds by db.seeds().all().collectAsState(emptyList());val fert by db.fertilizers().all().collectAsState(emptyList());val tasks by db.tasks().all().collectAsState(emptyList());LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Text("Добро пожаловать",style=MaterialTheme.typography.headlineMedium);Text("Растения, сад, хозяйство и знания в одном приложении.")};item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){StatCard("🌱","Посевы",crops.size.toString(),Modifier.weight(1f));StatCard("🌾","Семена",seeds.size.toString(),Modifier.weight(1f));StatCard("🧪","Удобрения",fert.size.toString(),Modifier.weight(1f))}};item{val low=fert.count{it.quantity<=it.minStock};Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text(if(low==0)"✅ Запас удобрений в норме" else "⚠️ Низкий запас: $low поз.",style=MaterialTheme.typography.titleMedium);Text("Активных задач: ${tasks.count{!it.done}}")}}};item{Text("Быстрый доступ",style=MaterialTheme.typography.titleLarge)};item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){QuickButton("🌱 Растения",Modifier.weight(1f)){nav("plants")};QuickButton("📅 Календарь",Modifier.weight(1f)){nav("calendar")}}};item{Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){QuickButton("🔔 Задачи",Modifier.weight(1f)){nav("tasks")};QuickButton("📊 Прибыль",Modifier.weight(1f)){nav("profit")}}}}}
-@Composable private fun StatCard(icon:String,title:String,value:String,modifier:Modifier){Card(modifier){Column(Modifier.padding(12.dp)){Text(icon);Text(value,style=MaterialTheme.typography.headlineSmall);Text(title)}}}
-@Composable private fun QuickButton(text:String,modifier:Modifier,onClick:()->Unit){OutlinedButton(onClick,modifier){Text(text)}}
+@Composable
+private fun InfoCard(title: String, text: String) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(text)
+        }
+    }
+}
 
-@Composable private fun PlantCatalogScreen(db:AppDb,initial:String){var query by remember{mutableStateOf("")};var selected by remember{mutableStateOf<Plant?>(null)};val favorites by db.favorites().all().collectAsState(emptyList());val scope=rememberCoroutineScope();val filtered=plants.filter{p->(initial=="Все растения"||p.category==initial)&&(query.isBlank()||p.name.contains(query,true)||p.family.contains(query,true))};if(selected!=null){PlantDetails(selected!!,favorites.any{it.plantId==selected!!.id},{scope.launch{if(favorites.any{it.plantId==selected!!.id})db.favorites().delete(FavoritePlant(selected!!.id))else db.favorites().add(FavoritePlant(selected!!.id))}},{selected=null});return};LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),label={Text("Поиск растений")})};items(filtered){p->Card{ListItem(headlineContent={Text("🌿 ${p.name}")},supportingContent={Text("${p.category} • ${p.family} • Полив: ${p.water}")},trailingContent={TextButton({selected=p}){Text("Открыть")}})}}}}
-@Composable private fun PlantDetails(p:Plant,favorite:Boolean,onFavorite:()->Unit,onBack:()->Unit){LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{TextButton(onBack){Text("← Назад")};Text(p.name,style=MaterialTheme.typography.headlineLarge);Text("${p.category} • семейство: ${p.family}")};item{Button(onFavorite,Modifier.fillMaxWidth()){Text(if(favorite)"❤️ Убрать из избранного" else "♡ Добавить в избранное")}};item{InfoCard("Описание",p.description)};item{InfoCard("Освещение",p.light)};item{InfoCard("Полив",p.water)};item{InfoCard("Почва",p.soil)};item{InfoCard("Болезни",p.diseases)};item{InfoCard("Вредители",p.pests)}}}
-@Composable private fun InfoCard(title:String,text:String){Card{Column(Modifier.padding(16.dp)){Text(title,style=MaterialTheme.typography.titleMedium);Spacer(Modifier.height(4.dp));Text(text)}}}
-@Composable private fun KnowledgeScreen(title:String,rows:List<Pair<String,String>>){LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text(title,style=MaterialTheme.typography.headlineSmall)};items(rows){(issue,plant)->ListItem(headlineContent={Text(issue)},supportingContent={Text("Растение: $plant")})}}}
+@Composable
+private fun SearchField(value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), label = { Text("Поиск") }, singleLine = true)
+}
 
-@Composable private fun CropScreen(db:AppDb)=SimpleCrudScreen("Культура","Посевы",db.crops().all().collectAsState(emptyList()).value,{Crop(name=it,area=0.0,sowDate="",harvestDate="",status="Запланировано",notes="")},{Text("Площадь: ${it.area} | ${it.status}")}){x->kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch{if(x.id==0L)db.crops().add(x)else db.crops().delete(x)}}
-@Composable private fun SeedScreen(db:AppDb){val list by db.seeds().all().collectAsState(emptyList());val s=rememberCoroutineScope();var name by remember{mutableStateOf("")};var qty by remember{mutableStateOf("0")};var unit by remember{mutableStateOf("шт")};var batch by remember{mutableStateOf("")};var expiry by remember{mutableStateOf("")};FormListScreen("Семена",{OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text("Название")});Row{OutlinedTextField(qty,{qty=it},Modifier.weight(1f),label={Text("Количество")});OutlinedTextField(unit,{unit=it},Modifier.weight(1f),label={Text("Единица")})};Row{OutlinedTextField(batch,{batch=it},Modifier.weight(1f),label={Text("Партия")});OutlinedTextField(expiry,{expiry=it},Modifier.weight(1f),label={Text("Срок годности")})};Button({if(name.isNotBlank())s.launch{db.seeds().add(Seed(name=name,quantity=qty.toDoubleOrNull()?:0.0,unit=unit,batch=batch,expiry=expiry));name=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${it.quantity} ${it.unit} • партия ${it.batch} • годность ${it.expiry}")}){s.launch{db.seeds().delete(it)}}}
-@Composable private fun FertilizerScreen(db:AppDb){val list by db.fertilizers().all().collectAsState(emptyList());val s=rememberCoroutineScope();var name by remember{mutableStateOf("")};var qty by remember{mutableStateOf("0")};var min by remember{mutableStateOf("1")};var unit by remember{mutableStateOf("кг")};FormListScreen("Удобрения",{OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text("Название")});Row{OutlinedTextField(qty,{qty=it},Modifier.weight(1f),label={Text("Остаток")});OutlinedTextField(min,{min=it},Modifier.weight(1f),label={Text("Минимум")});OutlinedTextField(unit,{unit=it},Modifier.weight(1f),label={Text("Единица")})};Button({if(name.isNotBlank())s.launch{db.fertilizers().add(Fertilizer(name=name,quantity=qty.toDoubleOrNull()?:0.0,unit=unit,minStock=min.toDoubleOrNull()?:0.0));name=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${if(it.quantity<=it.minStock)"⚠️ НИЗКИЙ ОСТАТОК" else "OK"} • ${it.quantity} ${it.unit} • минимум ${it.minStock}")}){s.launch{db.fertilizers().delete(it)}}}
-@Composable private fun IrrigationScreen(db:AppDb){val list by db.irrigations().all().collectAsState(emptyList());val s=rememberCoroutineScope();val ctx=LocalContext.current;var crop by remember{mutableStateOf("")};var date by remember{mutableStateOf("")};var time by remember{mutableStateOf("")};var volume by remember{mutableStateOf("0")};var repeat by remember{mutableStateOf("7")};FormListScreen("Полив",{OutlinedTextField(crop,{crop=it},Modifier.fillMaxWidth(),label={Text("Культура")});Row{OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата YYYY-MM-DD")});OutlinedTextField(time,{time=it},Modifier.weight(1f),label={Text("Время HH:mm")})};Row{OutlinedTextField(volume,{volume=it},Modifier.weight(1f),label={Text("Объём")});OutlinedTextField(repeat,{repeat=it},Modifier.weight(1f),label={Text("Каждые N дней")})};Button({if(crop.isNotBlank())s.launch{val x=Irrigation(crop=crop,date=date,time=time,volume=volume.toDoubleOrNull()?:0.0,repeatDays=repeat.toIntOrNull()?.coerceAtLeast(1)?:7);db.irrigations().add(x);scheduleReminder(ctx,"Полив: ${x.crop}",x.date,x.time,x.repeatDays);crop=""}},Modifier.fillMaxWidth()){Text("Добавить + уведомление")}},list,{Text("${it.date} ${it.time} • ${it.volume} • каждые ${it.repeatDays} дн.")}){s.launch{db.irrigations().delete(it)}}}
-@Composable private fun TaskScreen(db:AppDb){val list by db.tasks().all().collectAsState(emptyList());val s=rememberCoroutineScope();val ctx=LocalContext.current;var title by remember{mutableStateOf("")};var date by remember{mutableStateOf("")};var time by remember{mutableStateOf("")};var repeat by remember{mutableStateOf("1")};FormListScreen("Задачи и напоминания",{OutlinedTextField(title,{title=it},Modifier.fillMaxWidth(),label={Text("Задача")});Row{OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата YYYY-MM-DD")});OutlinedTextField(time,{time=it},Modifier.weight(1f),label={Text("Время HH:mm")})};OutlinedTextField(repeat,{repeat=it},Modifier.fillMaxWidth(),label={Text("Повтор каждые N дней")});Button({if(title.isNotBlank())s.launch{val x=Task(title=title,date=date,time=time,repeatDays=repeat.toIntOrNull()?.coerceAtLeast(1)?:1);db.tasks().add(x);scheduleReminder(ctx,x.title,x.date,x.time,x.repeatDays);title=""}},Modifier.fillMaxWidth()){Text("Добавить + уведомление")}},list,{Text("${if(it.done)"✅" else "🔔"} ${it.date} ${it.time} • ${it.title}")}){s.launch{db.tasks().delete(it)}}}
-@Composable private fun SalesScreen(db:AppDb){val list by db.sales().all().collectAsState(emptyList());val s=rememberCoroutineScope();var product by remember{mutableStateOf("")};var qty by remember{mutableStateOf("0")};var price by remember{mutableStateOf("0")};var buyer by remember{mutableStateOf("")};var date by remember{mutableStateOf("")};FormListScreen("Продажи",{OutlinedTextField(product,{product=it},Modifier.fillMaxWidth(),label={Text("Товар")});Row{OutlinedTextField(qty,{qty=it},Modifier.weight(1f),label={Text("Количество")});OutlinedTextField(price,{price=it},Modifier.weight(1f),label={Text("Цена")})};Row{OutlinedTextField(buyer,{buyer=it},Modifier.weight(1f),label={Text("Покупатель")});OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата")})};Button({if(product.isNotBlank())s.launch{db.sales().add(Sale(product=product,quantity=qty.toDoubleOrNull()?:0.0,price=price.toDoubleOrNull()?:0.0,buyer=buyer,date=date));product=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${it.quantity} × ${it.price} = ${it.quantity*it.price} • ${it.buyer} • ${it.date}")}){s.launch{db.sales().delete(it)}}}
-@Composable private fun HarvestScreen(db:AppDb){val list by db.harvests().all().collectAsState(emptyList());val s=rememberCoroutineScope();var crop by remember{mutableStateOf("")};var qty by remember{mutableStateOf("0")};var date by remember{mutableStateOf("")};var quality by remember{mutableStateOf("")};FormListScreen("Урожай",{OutlinedTextField(crop,{crop=it},Modifier.fillMaxWidth(),label={Text("Культура")});Row{OutlinedTextField(qty,{qty=it},Modifier.weight(1f),label={Text("Количество")});OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата")});OutlinedTextField(quality,{quality=it},Modifier.weight(1f),label={Text("Качество")})};Button({if(crop.isNotBlank())s.launch{db.harvests().add(Harvest(crop=crop,quantity=qty.toDoubleOrNull()?:0.0,date=date,quality=quality));crop=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${it.quantity} • ${it.date} • ${it.quality}")}){s.launch{db.harvests().delete(it)}}}
-@Composable private fun ExpenseScreen(db:AppDb){val list by db.expenses().all().collectAsState(emptyList());val s=rememberCoroutineScope();var category by remember{mutableStateOf("")};var amount by remember{mutableStateOf("0")};var date by remember{mutableStateOf("")};var note by remember{mutableStateOf("")};FormListScreen("Расходы",{OutlinedTextField(category,{category=it},Modifier.fillMaxWidth(),label={Text("Материал / категория")});Row{OutlinedTextField(amount,{amount=it},Modifier.weight(1f),label={Text("Сумма")});OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата")})};OutlinedTextField(note,{note=it},Modifier.fillMaxWidth(),label={Text("Комментарий")});Button({if(category.isNotBlank())s.launch{db.expenses().add(Expense(category=category,amount=amount.toDoubleOrNull()?:0.0,date=date,note=note));category=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${it.amount} • ${it.date} • ${it.note}")}){s.launch{db.expenses().delete(it)}}}
-@Composable private fun TreatmentScreen(db:AppDb){val list by db.treatments().all().collectAsState(emptyList());val s=rememberCoroutineScope();var crop by remember{mutableStateOf("")};var issue by remember{mutableStateOf("")};var product by remember{mutableStateOf("")};var date by remember{mutableStateOf("")};var note by remember{mutableStateOf("")};FormListScreen("Обработки",{OutlinedTextField(crop,{crop=it},Modifier.fillMaxWidth(),label={Text("Культура")});Row{OutlinedTextField(issue,{issue=it},Modifier.weight(1f),label={Text("Болезнь / вредитель")});OutlinedTextField(product,{product=it},Modifier.weight(1f),label={Text("Препарат")})};Row{OutlinedTextField(date,{date=it},Modifier.weight(1f),label={Text("Дата")});OutlinedTextField(note,{note=it},Modifier.weight(1f),label={Text("Примечание")})};Button({if(crop.isNotBlank())s.launch{db.treatments().add(Treatment(crop=crop,issue=issue,product=product,date=date,note=note));crop=""}},Modifier.fillMaxWidth()){Text("Добавить")}},list,{Text("${it.issue} • ${it.product} • ${it.date}")}){s.launch{db.treatments().delete(it)}}}
-@Composable private fun NotesScreen(db:AppDb){val list by db.notes().all().collectAsState(emptyList());val s=rememberCoroutineScope();var title by remember{mutableStateOf("")};var text by remember{mutableStateOf("")};FormListScreen("Блокнот",{OutlinedTextField(title,{title=it},Modifier.fillMaxWidth(),label={Text("Заголовок")});OutlinedTextField(text,{text=it},Modifier.fillMaxWidth(),minLines=3,label={Text("Запись")});Button({if(text.isNotBlank())s.launch{db.notes().add(Note(title=title.ifBlank{"Заметка"},text=text));title="";text=""}},Modifier.fillMaxWidth()){Text("Сохранить")}},list,{Text("${it.title}\n${it.text}")}){s.launch{db.notes().delete(it)}}}
-@Composable private fun FavoritesScreen(db:AppDb){val f by db.favorites().all().collectAsState(emptyList());val selected=plants.filter{p->f.any{it.plantId==p.id}};LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text("Избранные растения",style=MaterialTheme.typography.headlineSmall)};items(selected){p->InfoCard(p.name,"${p.category} • ${p.family}\n${p.description}")};if(selected.isEmpty())item{Text("Пока нет избранных растений")}}}
-@Composable private fun CalendarScreen(db:AppDb){val ir by db.irrigations().all().collectAsState(emptyList());val tasks by db.tasks().all().collectAsState(emptyList());LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text("Календарь садовода",style=MaterialTheme.typography.headlineSmall);Text("Поливы и аграрные задачи.")};items(ir){x->ListItem(headlineContent={Text("💧 ${x.crop}")},supportingContent={Text("${x.date} ${x.time} • ${x.volume} • каждые ${x.repeatDays} дн.")})};items(tasks){x->ListItem(headlineContent={Text("${if(x.done)"✅" else "🔔"} ${x.title}")},supportingContent={Text("${x.date} ${x.time} • каждые ${x.repeatDays} дн.")})}}}
-@Composable private fun WarehouseScreen(db:AppDb){val seeds by db.seeds().all().collectAsState(emptyList());val fert by db.fertilizers().all().collectAsState(emptyList());LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text("Склад",style=MaterialTheme.typography.headlineSmall)};item{Text("Семена",style=MaterialTheme.typography.titleLarge)};items(seeds){x->ListItem(headlineContent={Text("🌾 ${x.name}")},supportingContent={Text("${x.quantity} ${x.unit} • партия ${x.batch} • годность ${x.expiry}")})};item{Text("Удобрения",style=MaterialTheme.typography.titleLarge)};items(fert){x->ListItem(headlineContent={Text("🧪 ${x.name}")},supportingContent={Text("${x.quantity} ${x.unit} • минимум ${x.minStock}${if(x.quantity<=x.minStock)" • ⚠️" else ""}")})}}}
-@Composable private fun ProfitScreen(db:AppDb){val sales by db.sales().all().collectAsState(emptyList());val expenses by db.expenses().all().collectAsState(emptyList());val revenue=sales.sumOf{it.quantity*it.price};val cost=expenses.sumOf{it.amount};Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){InfoCard("Выручка","%.2f".format(revenue));InfoCard("Расходы","%.2f".format(cost));InfoCard("Прибыль","%.2f".format(revenue-cost));Text("Прибыль = продажи − расходы.")}}
+@Composable
+private fun Field(value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier) {
+    OutlinedTextField(value, onChange, modifier.fillMaxWidth(), label = { Text(label) })
+}
 
-@Composable private fun <T> FormListScreen(title:String,form:@Composable ColumnScope.()->Unit,list:List<T>,summary:@Composable (T)->Unit,delete:(T)->Unit){LazyColumn(Modifier.fillMaxSize().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Text(title,style=MaterialTheme.typography.headlineSmall);Column(verticalArrangement=Arrangement.spacedBy(8.dp),content=form)};items(list){x->Card{Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.SpaceBetween){Box(Modifier.weight(1f)){summary(x)};TextButton({delete(x)}){Text("🗑️")}}}}}}
-@Composable private fun <T> SimpleCrudScreen(title:String,label:String,list:List<T>,create:(String)->T,summary:@Composable (T)->Unit,delete:(T)->Unit){var name by remember{mutableStateOf("")};FormListScreen(label,{Row(Modifier.fillMaxWidth()){OutlinedTextField(name,{name=it},Modifier.weight(1f),label={Text(title)});Button({if(name.isNotBlank()){delete(create(name));name=""}},Modifier.padding(start=8.dp)){Text("➕")}}},list,summary,delete)}
+@Composable
+private fun Actions(onEdit: () -> Unit, onDelete: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = onEdit) { Text("✏️ Изменить") }
+        TextButton(onClick = onDelete) { Text("🗑️") }
+    }
+}
 
-private fun scheduleReminder(context:Context,title:String,date:String,time:String,repeatDays:Int){try{val target=LocalDateTime.parse("$date $time",DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));val delay=Duration.between(LocalDateTime.now(),target).toMillis().coerceAtLeast(0);val data=Data.Builder().putString("title",title).putInt("repeatDays",repeatDays).putString("dateTime",target.toString()).build();val request=OneTimeWorkRequestBuilder<ReminderWorker>().setInitialDelay(delay,java.util.concurrent.TimeUnit.MILLISECONDS).setInputData(data).build();WorkManager.getInstance(context).enqueue(request)}catch(_:Exception){}}
-private suspend fun exportBackup(context:Context,db:AppDb,uri:Uri){val json="""{"version":2,"crops":${db.crops().all().first()},"seeds":${db.seeds().all().first()},"fertilizers":${db.fertilizers().all().first()},"irrigations":${db.irrigations().all().first()},"sales":${db.sales().all().first()},"harvests":${db.harvests().all().first()},"expenses":${db.expenses().all().first()},"treatments":${db.treatments().all().first()},"tasks":${db.tasks().all().first()},"notes":${db.notes().all().first()}}""";context.contentResolver.openOutputStream(uri)?.use{it.write(json.toByteArray())}}
-private fun exportQuiz(context:Context,uri:Uri){val text="AgroGarden — викторина\n\n1. Что нужно томату?\nA) Свет и тепло\nB) Полная тень\n\n2. Вредитель картофеля?\nA) Колорадский жук\nB) Яблонная плодожорка\n\n3. Что означает минимальный запас?\nA) Порог предупреждения\nB) Дата посадки\n";context.contentResolver.openOutputStream(uri)?.use{it.write(text.toByteArray())}}
+@Composable
+private fun CropsScreen(db: AppDb) {
+    val list by db.crops().all().collectAsState(emptyList())
+    val scope = rememberCoroutineScope()
+    var query by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf<Crop?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    val filtered = list.filter { it.name.contains(query, true) || it.status.contains(query, true) }
+    Column(Modifier.padding(12.dp)) {
+        SearchField(query) { query = it }
+        Spacer(Modifier.height(8.dp))
+        Button({ adding = true }, Modifier.fillMaxWidth()) { Text("➕ Добавить посев") }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(filtered) { x ->
+                Card(Modifier.fillMaxWidth()) {
+                    ListRow("🌾 ${x.name}", "${x.area} га • посев ${x.sowDate} • уборка ${x.harvestDate}\nСтатус: ${x.status}\n${x.notes}") {
+                        Actions({ editing = x }, { scope.launch { db.crops().delete(x) } })
+                    }
+                }
+            }
+        }
+    }
+    if (adding) CropEditor(null, { x -> scope.launch { db.crops().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> CropEditor(old, { x -> scope.launch { db.crops().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun CropEditor(item: Crop?, save: (Crop) -> Unit, cancel: () -> Unit) {
+    var name by remember(item) { mutableStateOf(item?.name ?: "") }
+    var area by remember(item) { mutableStateOf(item?.area?.toString() ?: "0") }
+    var sow by remember(item) { mutableStateOf(item?.sowDate ?: "") }
+    var harvest by remember(item) { mutableStateOf(item?.harvestDate ?: "") }
+    var status by remember(item) { mutableStateOf(item?.status ?: "Запланировано") }
+    var notes by remember(item) { mutableStateOf(item?.notes ?: "") }
+    EditorDialog(if (item == null) "Новый посев" else "Изменить посев", cancel, {
+        if (name.isNotBlank()) save(Crop(item?.id ?: 0, name, area.toDoubleOrNull() ?: 0.0, sow, harvest, status, notes))
+    }) {
+        Field(name, { name = it }, "Культура")
+        Field(area, { area = it }, "Площадь, га")
+        Field(sow, { sow = it }, "Дата посева")
+        Field(harvest, { harvest = it }, "Дата уборки")
+        Field(status, { status = it }, "Статус")
+        Field(notes, { notes = it }, "Примечания")
+    }
+}
+
+@Composable
+private fun SeedsScreen(db: AppDb) {
+    val list by db.seeds().all().collectAsState(emptyList())
+    val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Seed?>(null) }
+    val filtered = list.filter { it.name.contains(query, true) || it.batch.contains(query, true) }
+    CrudHeader("Семена", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(filtered) { x -> Card(Modifier.fillMaxWidth()) { ListRow("🌱 ${x.name}", "${x.quantity} ${x.unit} • партия: ${x.batch} • срок: ${x.expiry}") { Actions({ editing = x }, { scope.launch { db.seeds().delete(x) } }) } } }
+    }
+    if (adding) SeedEditor(null, { x -> scope.launch { db.seeds().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> SeedEditor(old, { x -> scope.launch { db.seeds().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun SeedEditor(item: Seed?, save: (Seed) -> Unit, cancel: () -> Unit) {
+    var name by remember(item) { mutableStateOf(item?.name ?: "") }; var quantity by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "0") }; var unit by remember(item) { mutableStateOf(item?.unit ?: "шт") }; var batch by remember(item) { mutableStateOf(item?.batch ?: "") }; var expiry by remember(item) { mutableStateOf(item?.expiry ?: "") }
+    EditorDialog(if (item == null) "Новые семена" else "Изменить семена", cancel, { if (name.isNotBlank()) save(Seed(item?.id ?: 0, name, quantity.toDoubleOrNull() ?: 0.0, unit, batch, expiry)) }) {
+        Field(name, { name = it }, "Название"); Field(quantity, { quantity = it }, "Количество"); Field(unit, { unit = it }, "Единица измерения"); Field(batch, { batch = it }, "Партия"); Field(expiry, { expiry = it }, "Срок годности")
+    }
+}
+
+@Composable
+private fun FertilizersScreen(db: AppDb) {
+    val list by db.fertilizers().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Fertilizer?>(null) }
+    CrudHeader("Удобрения", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(list.filter { it.name.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow(if (x.quantity <= x.minStock) "⚠️ ${x.name}" else "🧪 ${x.name}", "Остаток: ${x.quantity} ${x.unit} • минимум: ${x.minStock}") { Actions({ editing = x }, { scope.launch { db.fertilizers().delete(x) } }) } } }
+    }
+    if (adding) FertilizerEditor(null, { x -> scope.launch { db.fertilizers().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> FertilizerEditor(old, { x -> scope.launch { db.fertilizers().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun FertilizerEditor(item: Fertilizer?, save: (Fertilizer) -> Unit, cancel: () -> Unit) {
+    var name by remember(item) { mutableStateOf(item?.name ?: "") }; var quantity by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "0") }; var unit by remember(item) { mutableStateOf(item?.unit ?: "кг") }; var min by remember(item) { mutableStateOf(item?.minStock?.toString() ?: "1") }
+    EditorDialog(if (item == null) "Новое удобрение" else "Изменить удобрение", cancel, { if (name.isNotBlank()) save(Fertilizer(item?.id ?: 0, name, quantity.toDoubleOrNull() ?: 0.0, unit, min.toDoubleOrNull() ?: 0.0)) }) {
+        Field(name, { name = it }, "Название"); Field(quantity, { quantity = it }, "Остаток"); Field(unit, { unit = it }, "Единица"); Field(min, { min = it }, "Минимальный запас")
+    }
+}
+
+@Composable
+private fun IrrigationScreen(db: AppDb) {
+    val list by db.irrigations().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Irrigation?>(null) }
+    CrudHeader("Полив", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.crop.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("💧 ${x.crop}", "${x.date} ${x.time} • ${x.volume} л • каждые ${x.repeatDays} дн.") { Actions({ editing = x }, { scope.launch { db.irrigations().delete(x) } }) } } } }
+    if (adding) IrrigationEditor(null, { x -> scope.launch { db.irrigations().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> IrrigationEditor(old, { x -> scope.launch { db.irrigations().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun IrrigationEditor(item: Irrigation?, save: (Irrigation) -> Unit, cancel: () -> Unit) {
+    var crop by remember(item) { mutableStateOf(item?.crop ?: "") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }; var time by remember(item) { mutableStateOf(item?.time ?: "") }; var volume by remember(item) { mutableStateOf(item?.volume?.toString() ?: "0") }; var repeat by remember(item) { mutableStateOf(item?.repeatDays?.toString() ?: "7") }
+    EditorDialog(if (item == null) "Новый полив" else "Изменить полив", cancel, { if (crop.isNotBlank()) save(Irrigation(item?.id ?: 0, crop, date, time, volume.toDoubleOrNull() ?: 0.0, repeat.toIntOrNull() ?: 0)) }) {
+        Field(crop, { crop = it }, "Культура"); Field(date, { date = it }, "Дата (ГГГГ-ММ-ДД)"); Field(time, { time = it }, "Время"); Field(volume, { volume = it }, "Объём, л"); Field(repeat, { repeat = it }, "Периодичность, дней")
+    }
+}
+
+@Composable
+private fun TasksScreen(db: AppDb) {
+    val list by db.tasks().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Task?>(null) }
+    CrudHeader("Напоминания", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.title.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow(if (x.done) "✅ ${x.title}" else "🔔 ${x.title}", "${x.date} ${x.time} • каждые ${x.repeatDays} дн.") { Row { TextButton({ scope.launch { db.tasks().update(x.copy(done = !x.done)) } }) { Text(if (x.done) "Открыть" else "Готово") }; Actions({ editing = x }, { scope.launch { db.tasks().delete(x) } }) } } } } }
+    if (adding) TaskEditor(null, { x -> scope.launch { db.tasks().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> TaskEditor(old, { x -> scope.launch { db.tasks().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun TaskEditor(item: Task?, save: (Task) -> Unit, cancel: () -> Unit) {
+    var title by remember(item) { mutableStateOf(item?.title ?: "") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }; var time by remember(item) { mutableStateOf(item?.time ?: "") }; var repeat by remember(item) { mutableStateOf(item?.repeatDays?.toString() ?: "0") }; var done by remember(item) { mutableStateOf(item?.done ?: false) }
+    EditorDialog(if (item == null) "Новое напоминание" else "Изменить напоминание", cancel, { if (title.isNotBlank()) save(Task(item?.id ?: 0, title, date, time, repeat.toIntOrNull() ?: 0, done)) }) {
+        Field(title, { title = it }, "Задача"); Field(date, { date = it }, "Дата"); Field(time, { time = it }, "Время"); Field(repeat, { repeat = it }, "Повторять каждые, дней"); TextButton({ done = !done }) { Text(if (done) "Статус: выполнено" else "Статус: не выполнено") }
+    }
+}
+
+@Composable
+private fun SalesScreen(db: AppDb) {
+    val list by db.sales().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Sale?>(null) }
+    val revenue = list.sumOf { it.quantity * it.price }
+    CrudHeader("Продажи • выручка ${money(revenue)}", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.product.contains(query, true) || it.buyer.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("💰 ${x.product}", "${x.quantity} × ${money(x.price)} = ${money(x.quantity * x.price)}\nПокупатель: ${x.buyer} • ${x.date}") { Actions({ editing = x }, { scope.launch { db.sales().delete(x) } }) } } } }
+    if (adding) SaleEditor(null, { x -> scope.launch { db.sales().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> SaleEditor(old, { x -> scope.launch { db.sales().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun SaleEditor(item: Sale?, save: (Sale) -> Unit, cancel: () -> Unit) {
+    var product by remember(item) { mutableStateOf(item?.product ?: "") }; var quantity by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "1") }; var price by remember(item) { mutableStateOf(item?.price?.toString() ?: "0") }; var buyer by remember(item) { mutableStateOf(item?.buyer ?: "") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }
+    EditorDialog(if (item == null) "Новая продажа" else "Изменить продажу", cancel, { if (product.isNotBlank()) save(Sale(item?.id ?: 0, product, quantity.toDoubleOrNull() ?: 0.0, price.toDoubleOrNull() ?: 0.0, buyer, date)) }) {
+        Field(product, { product = it }, "Товар / урожай"); Field(quantity, { quantity = it }, "Количество"); Field(price, { price = it }, "Цена за единицу"); Text("Выручка: ${money((quantity.toDoubleOrNull() ?: 0.0) * (price.toDoubleOrNull() ?: 0.0))}"); Field(buyer, { buyer = it }, "Покупатель"); Field(date, { date = it }, "Дата")
+    }
+}
+
+@Composable
+private fun HarvestScreen(db: AppDb) {
+    val list by db.harvests().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Harvest?>(null) }
+    CrudHeader("Урожай", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.crop.contains(query, true) || it.quality.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("🧺 ${x.crop}", "${x.quantity} • ${x.date} • качество: ${x.quality}") { Actions({ editing = x }, { scope.launch { db.harvests().delete(x) } }) } } } }
+    if (adding) HarvestEditor(null, { x -> scope.launch { db.harvests().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> HarvestEditor(old, { x -> scope.launch { db.harvests().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun HarvestEditor(item: Harvest?, save: (Harvest) -> Unit, cancel: () -> Unit) {
+    var crop by remember(item) { mutableStateOf(item?.crop ?: "") }; var quantity by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "0") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }; var quality by remember(item) { mutableStateOf(item?.quality ?: "") }
+    EditorDialog(if (item == null) "Новый урожай" else "Изменить урожай", cancel, { if (crop.isNotBlank()) save(Harvest(item?.id ?: 0, crop, quantity.toDoubleOrNull() ?: 0.0, date, quality)) }) { Field(crop, { crop = it }, "Культура"); Field(quantity, { quantity = it }, "Количество"); Field(date, { date = it }, "Дата"); Field(quality, { quality = it }, "Качество") }
+}
+
+@Composable
+private fun ExpensesScreen(db: AppDb) {
+    val list by db.expenses().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Expense?>(null) }
+    val total = list.sumOf { it.amount }; CrudHeader("Расходы • ${money(total)}", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.category.contains(query, true) || it.note.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("📉 ${x.category}", "${money(x.amount)} • ${x.date}\n${x.note}") { Actions({ editing = x }, { scope.launch { db.expenses().delete(x) } }) } } } }
+    if (adding) ExpenseEditor(null, { x -> scope.launch { db.expenses().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> ExpenseEditor(old, { x -> scope.launch { db.expenses().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun ExpenseEditor(item: Expense?, save: (Expense) -> Unit, cancel: () -> Unit) {
+    var category by remember(item) { mutableStateOf(item?.category ?: "") }; var amount by remember(item) { mutableStateOf(item?.amount?.toString() ?: "0") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }; var note by remember(item) { mutableStateOf(item?.note ?: "") }
+    EditorDialog(if (item == null) "Новый расход" else "Изменить расход", cancel, { if (category.isNotBlank()) save(Expense(item?.id ?: 0, category, amount.toDoubleOrNull() ?: 0.0, date, note)) }) { Field(category, { category = it }, "Категория / материал"); Field(amount, { amount = it }, "Сумма"); Field(date, { date = it }, "Дата"); Field(note, { note = it }, "Комментарий") }
+}
+
+@Composable
+private fun TreatmentsScreen(db: AppDb) {
+    val list by db.treatments().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Treatment?>(null) }
+    CrudHeader("Обработки", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.crop.contains(query, true) || it.issue.contains(query, true) || it.product.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("🛡️ ${x.crop}", "Проблема: ${x.issue}\nПрепарат: ${x.product} • ${x.date}\n${x.note}") { Actions({ editing = x }, { scope.launch { db.treatments().delete(x) } }) } } } }
+    if (adding) TreatmentEditor(null, { x -> scope.launch { db.treatments().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> TreatmentEditor(old, { x -> scope.launch { db.treatments().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun TreatmentEditor(item: Treatment?, save: (Treatment) -> Unit, cancel: () -> Unit) {
+    var crop by remember(item) { mutableStateOf(item?.crop ?: "") }; var issue by remember(item) { mutableStateOf(item?.issue ?: "") }; var product by remember(item) { mutableStateOf(item?.product ?: "") }; var date by remember(item) { mutableStateOf(item?.date ?: "") }; var note by remember(item) { mutableStateOf(item?.note ?: "") }
+    EditorDialog(if (item == null) "Новая обработка" else "Изменить обработку", cancel, { if (crop.isNotBlank()) save(Treatment(item?.id ?: 0, crop, issue, product, date, note)) }) { Field(crop, { crop = it }, "Культура"); Field(issue, { issue = it }, "Болезнь / вредитель / профилактика"); Field(product, { product = it }, "Препарат"); Field(date, { date = it }, "Дата"); Field(note, { note = it }, "Примечание") }
+}
+
+@Composable
+private fun CalendarScreen(db: AppDb) {
+    val irrigations by db.irrigations().all().collectAsState(emptyList()); val tasks by db.tasks().all().collectAsState(emptyList())
+    LazyColumn(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item { Text("📅 Календарь", style = MaterialTheme.typography.headlineSmall) }
+        item { Text("Поливы и аграрные задачи. Для редактирования откройте соответствующий раздел.") }
+        items(irrigations) { Text("💧 ${it.date} ${it.time} • ${it.crop} • ${it.volume} л") }
+        items(tasks) { Text("🔔 ${it.date} ${it.time} • ${it.title} ${if (it.done) "✅" else ""}") }
+    }
+}
+
+@Composable
+private fun WarehouseScreen(db: AppDb) {
+    val seeds by db.seeds().all().collectAsState(emptyList()); val fertilizers by db.fertilizers().all().collectAsState(emptyList())
+    LazyColumn(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { Text("📦 Склад", style = MaterialTheme.typography.headlineSmall) }
+        item { Text("Семена") }; items(seeds) { InfoCard("🌱 ${it.name}", "${it.quantity} ${it.unit} • партия ${it.batch} • срок ${it.expiry}") }
+        item { Text("Удобрения") }; items(fertilizers) { InfoCard(if (it.quantity <= it.minStock) "⚠️ ${it.name}" else "🧪 ${it.name}", "${it.quantity} ${it.unit} • минимум ${it.minStock}") }
+    }
+}
+
+@Composable
+private fun ProfitScreen(db: AppDb) {
+    val sales by db.sales().all().collectAsState(emptyList()); val expenses by db.expenses().all().collectAsState(emptyList()); val revenue = sales.sumOf { it.quantity * it.price }; val costs = expenses.sumOf { it.amount }
+    LazyColumn(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { item { Text("📊 Прибыль", style = MaterialTheme.typography.headlineSmall) }; item { InfoCard("Выручка", money(revenue)) }; item { InfoCard("Расходы", money(costs)) }; item { InfoCard("Прибыль", money(revenue - costs)) }; item { Text("Показатель рассчитывается автоматически из Продаж и Расходов.") } }
+}
+
+@Composable
+private fun NotesScreen(db: AppDb) {
+    val list by db.notes().all().collectAsState(emptyList()); val scope = rememberCoroutineScope(); var query by remember { mutableStateOf("") }; var adding by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Note?>(null) }
+    CrudHeader("Блокнот", query, { query = it }, { adding = true })
+    LazyColumn(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items(list.filter { it.title.contains(query, true) || it.text.contains(query, true) }) { x -> Card(Modifier.fillMaxWidth()) { ListRow("📝 ${x.title}", x.text) { Actions({ editing = x }, { scope.launch { db.notes().delete(x) } }) } } } }
+    if (adding) NoteEditor(null, { x -> scope.launch { db.notes().add(x) }; adding = false }, { adding = false })
+    editing?.let { old -> NoteEditor(old, { x -> scope.launch { db.notes().update(x) }; editing = null }, { editing = null }) }
+}
+
+@Composable
+private fun NoteEditor(item: Note?, save: (Note) -> Unit, cancel: () -> Unit) {
+    var title by remember(item) { mutableStateOf(item?.title ?: "") }; var text by remember(item) { mutableStateOf(item?.text ?: "") }
+    EditorDialog(if (item == null) "Новая запись" else "Изменить запись", cancel, { if (title.isNotBlank()) save(Note(item?.id ?: 0, title, text, item?.createdAt ?: System.currentTimeMillis())) }) { Field(title, { title = it }, "Заголовок"); Field(text, { text = it }, "Текст") }
+}
+
+@Composable
+private fun CrudHeader(title: String, query: String, setQuery: (String) -> Unit, add: () -> Unit) {
+    Column(Modifier.padding(12.dp)) { Text(title, style = MaterialTheme.typography.headlineSmall); Spacer(Modifier.height(6.dp)); SearchField(query, setQuery); Spacer(Modifier.height(6.dp)); Button(add, Modifier.fillMaxWidth()) { Text("➕ Добавить") } }
+}
+
+@Composable
+private fun ListRow(title: String, details: String, actions: @Composable () -> Unit) {
+    Column(Modifier.padding(12.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text(details); Spacer(Modifier.height(4.dp)); Divider(); actions() }
+}
+
+@Composable
+private fun EditorDialog(title: String, cancel: () -> Unit, save: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    AlertDialog(
+        onDismissRequest = cancel,
+        title = { Text(title) },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = content) },
+        confirmButton = { Button(save) { Text("Сохранить") } },
+        dismissButton = { TextButton(cancel) { Text("Отмена") } }
+    )
+}
+
+private fun money(value: Double): String = String.format("%.2f", value)
