@@ -5,6 +5,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -23,26 +24,33 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 .setContentTitle("AgroGarden")
                 .setContentText(title)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true)
                 .build()
         )
 
         val repeatDays = inputData.getInt("repeatDays", 0)
         val dateTime = inputData.getString("dateTime")
-        if (repeatDays > 0 && !dateTime.isNullOrBlank()) {
-            try {
+        val uniqueName = inputData.getString("uniqueName")
+        if (repeatDays > 0 && !dateTime.isNullOrBlank() && !uniqueName.isNullOrBlank()) {
+            return try {
                 val next = LocalDateTime.parse(dateTime).plusDays(repeatDays.toLong())
                 val delay = Duration.between(LocalDateTime.now(), next).toMillis().coerceAtLeast(0)
                 val data = Data.Builder()
                     .putString("title", title)
                     .putInt("repeatDays", repeatDays)
                     .putString("dateTime", next.toString())
+                    .putString("uniqueName", uniqueName)
                     .build()
                 val request = OneTimeWorkRequestBuilder<ReminderWorker>()
                     .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                     .setInputData(data)
                     .build()
-                WorkManager.getInstance(applicationContext).enqueue(request)
-            } catch (_: Exception) { }
+                WorkManager.getInstance(applicationContext)
+                    .enqueueUniqueWork(uniqueName, ExistingWorkPolicy.REPLACE, request)
+                Result.success()
+            } catch (_: Exception) {
+                Result.failure()
+            }
         }
         return Result.success()
     }
