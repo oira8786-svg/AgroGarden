@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <application android:theme="@style/AppTheme" android:label="AgroGarden" android:allowBackup="true">
+    <application android:theme="@style/AppTheme" android:label="FAYOZAGRO" android:allowBackup="true">
         <activity android:name=".ProductionMainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
